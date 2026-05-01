@@ -1,11 +1,13 @@
 import path from 'node:path';
 import kuromoji from 'kuromoji';
-import Kuroshiro from 'kuroshiro';
-import KuromojiAnalyzer from 'kuroshiro-analyzer-kuromoji';
+import KuroshiroModule from 'kuroshiro';
+import KuromojiAnalyzerModule from 'kuroshiro-analyzer-kuromoji';
 import wanakana from 'wanakana';
 import { ROOT_DIR } from '../config.js';
 
 const dictPath = path.join(ROOT_DIR, 'node_modules', 'kuromoji', 'dict');
+const Kuroshiro = KuroshiroModule.default ?? KuroshiroModule;
+const KuromojiAnalyzer = KuromojiAnalyzerModule.default ?? KuromojiAnalyzerModule;
 
 let tokenizerPromise;
 let kuroshiroPromise;
@@ -21,7 +23,7 @@ function normalizeLineBreaks(text) {
 function getTokenizer() {
   if (!tokenizerPromise) {
     tokenizerPromise = new Promise((resolve, reject) => {
-      kuromoji.builder({ dictPath }).build((error, tokenizer) => {
+      kuromoji.builder({ dicPath: dictPath }).build((error, tokenizer) => {
         if (error) {
           reject(error);
           return;

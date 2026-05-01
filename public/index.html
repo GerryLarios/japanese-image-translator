@@ -14,17 +14,39 @@
 
         <form id="upload-form" class="upload-form">
           <label>
-            <span>Lesson</span>
-            <input type="number" name="lesson" min="1" value="1" required />
+            <span>Name</span>
+            <input type="text" name="name" placeholder="Persona 5 menu screenshot" />
           </label>
 
           <label>
             <span>Screenshot</span>
-            <input type="file" name="image" accept="image/*" required />
+            <input type="file" name="image" accept="image/*" />
           </label>
+
+          <label>
+            <span>Pasted text</span>
+            <textarea
+              name="pastedText"
+              rows="5"
+              placeholder="Paste Japanese text copied from macOS Live Text here to skip OCR."
+            ></textarea>
+          </label>
+
+          <input type="hidden" name="lesson" value="1" />
 
           <button type="submit">Process screenshot</button>
         </form>
+
+        <div id="progress-panel" class="progress-panel hidden" aria-live="polite">
+          <div class="progress-header">
+            <strong id="progress-stage">Uploading screenshot</strong>
+            <span id="progress-percent">0%</span>
+          </div>
+          <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <div id="progress-bar" class="progress-bar"></div>
+          </div>
+          <p id="progress-message" class="muted progress-message"></p>
+        </div>
 
         <p id="status" class="status muted"></p>
       </section>
@@ -40,6 +62,7 @@
       <section class="panel">
         <div class="section-title">
           <h2>Recent screenshots</h2>
+          <button id="nuke-button" type="button" class="danger-button">Nuke all</button>
         </div>
         <div id="history" class="history muted">Nothing here yet.</div>
       </section>

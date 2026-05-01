@@ -16,3 +16,4 @@ export const LOCAL_DICTIONARY_FILE = path.join(DATA_DIR, 'localDictionary.json')
 export const PORT = Number.parseInt(process.env.PORT ?? '3000', 10);
 export const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL ?? 'http://127.0.0.1:11434';
 export const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? 'qwen2.5:7b';
+export const OCR_ENGINE = process.env.OCR_ENGINE ?? (process.platform === 'darwin' ? 'apple-vision' : 'tesseract');

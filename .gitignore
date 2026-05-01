@@ -1,5 +1,8 @@
 node_modules
 .DS_Store
+jpn.traineddata
+data/entries.json
+data/screenshots-index.json
 data/uploads/*
 data/screenshots/*
 !data/uploads/.gitkeep

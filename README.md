@@ -5,7 +5,8 @@ Local Node.js app to receive Japanese game screenshots, extract text with OCR, t
 ## What it does
 
 - Accepts screenshot uploads from a browser or any HTTP client
-- Runs local Japanese OCR with Tesseract.js
+- Accepts pasted Japanese text copied from macOS Live Text or another OCR source
+- Runs local Japanese OCR with Apple Vision on macOS and Tesseract elsewhere
 - Tokenizes text into vocabulary entries with hiragana and romaji
 - Translates sentences and vocabulary with a local open model
 - Saves reusable entries in the requested JSON shape
@@ -43,20 +44,67 @@ npm start
 
 Open `http://localhost:3000`.
 
+You can either upload a screenshot or paste Japanese text directly into the form. If both are provided, the pasted text is used and the uploaded image is kept only as a visual reference.
+
+## UI workflow
+
+- Add a **Name** to label the screenshot or pasted text job
+- Upload a screenshot, paste Japanese text, or do both
+- Watch the progress bar for OCR, analysis, translation, and saving stages
+- Remove one result with the `×` button in **Recent screenshots**
+- Use **Nuke all** to clear all generated screenshots, uploads, and entries from local storage
+
 ## API
 
 ### Upload a screenshot
 
 ```bash
 curl -X POST http://localhost:3000/api/upload \
+  -F name="Persona 5 menu" \
   -F lesson=1 \
   -F image=@/path/to/screenshot.png
+```
+
+### Upload pasted text
+
+```bash
+curl -X POST http://localhost:3000/api/upload \
+  -F name="Live Text capture" \
+  -F lesson=1 \
+  -F pastedText="一寸法師"
+```
+
+### Start an async job
+
+```bash
+curl -X POST http://localhost:3000/api/upload/jobs \
+  -F name="Live Text capture" \
+  -F lesson=1 \
+  -F pastedText="一寸法師"
+```
+
+### Poll job progress
+
+```bash
+curl http://localhost:3000/api/jobs/<job-id>
 ```
 
 ### Export all entries
 
 ```bash
 curl http://localhost:3000/api/entries/export
+```
+
+### Delete one saved screenshot
+
+```bash
+curl -X DELETE http://localhost:3000/api/screenshots/shot-0001
+```
+
+### Clear all generated local data
+
+```bash
+curl -X DELETE http://localhost:3000/api/data
 ```
 
 ## ROG Ally sender example
@@ -93,10 +141,14 @@ When a new screenshot appears in that folder, the sender uploads it automaticall
 
 ## Data files
 
-- `data/entries.json`: all saved vocabulary and sentence entries
-- `data/screenshots/*.json`: per-screenshot processing results
-- `data/uploads/*`: uploaded images
+- `data/entries.json`: runtime-generated vocabulary and sentence entries
+- `data/screenshots/*.json`: runtime-generated per-screenshot processing results
+- `data/uploads/*`: runtime-generated uploaded images
 - `data/localDictionary.json`: local overrides for preferred translations
+
+Generated files in `data/entries.json`, `data/screenshots-index.json`, `data/screenshots/*`, and `data/uploads/*` are local runtime data and should not be committed.
+
+If you commit this project, the expected tracked data file is `data/localDictionary.json`. The other data files are local state only.
 
 ## Dictionary overrides
 

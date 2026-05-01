@@ -42,6 +42,7 @@ label {
 }
 
 input,
+textarea,
 button {
   border-radius: 10px;
   border: 1px solid #334155;
@@ -58,12 +59,21 @@ button {
   font-weight: 700;
 }
 
+.danger-button {
+  background: #7f1d1d;
+  border-color: #b91c1c;
+}
+
 .muted {
   color: #94a3b8;
 }
 
 .error {
   color: #fca5a5;
+}
+
+.hidden {
+  display: none;
 }
 
 .section-title {
@@ -83,6 +93,43 @@ button {
   gap: 16px;
 }
 
+.progress-panel {
+  margin-top: 20px;
+  display: grid;
+  gap: 10px;
+}
+
+.progress-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.progress-track {
+  width: 100%;
+  height: 12px;
+  background: #020617;
+  border: 1px solid #334155;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, #2563eb 0%, #38bdf8 100%);
+  transition: width 0.3s ease;
+}
+
+.progress-message {
+  margin: 0;
+}
+
+.error-state .progress-bar {
+  background: linear-gradient(90deg, #dc2626 0%, #f87171 100%);
+}
+
 .preview {
   width: 100%;
   max-height: 420px;
@@ -90,6 +137,14 @@ button {
   border-radius: 12px;
   background: #020617;
   border: 1px solid #334155;
+}
+
+.preview-text {
+  min-height: 120px;
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  text-align: center;
 }
 
 .ocr {
@@ -109,10 +164,30 @@ button {
 }
 
 .history-item {
+  position: relative;
   display: grid;
   grid-template-columns: 160px 1fr;
   gap: 16px;
   margin-bottom: 16px;
+}
+
+.history-content {
+  padding-right: 56px;
+}
+
+.history-delete-button {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  font-size: 24px;
+  line-height: 1;
+  background: #7f1d1d;
+  border-color: #b91c1c;
 }
 
 .history-item img {
@@ -120,6 +195,18 @@ button {
   border-radius: 10px;
   object-fit: cover;
   max-height: 120px;
+}
+
+.history-placeholder {
+  width: 100%;
+  min-height: 120px;
+  border-radius: 10px;
+  border: 1px dashed #334155;
+  display: grid;
+  place-items: center;
+  color: #93c5fd;
+  font-weight: 700;
+  letter-spacing: 0.08em;
 }
 
 .table-wrap {
