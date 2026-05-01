@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>japanse-image-translator</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="layout">
+      <section class="panel">
+        <h1>japanse-image-translator</h1>
+        <p class="muted">Upload a Japanese game screenshot and save structured English/Spanish study entries.</p>
+
+        <form id="upload-form" class="upload-form">
+          <label>
+            <span>Lesson</span>
+            <input type="number" name="lesson" min="1" value="1" required />
+          </label>
+
+          <label>
+            <span>Screenshot</span>
+            <input type="file" name="image" accept="image/*" required />
+          </label>
+
+          <button type="submit">Process screenshot</button>
+        </form>
+
+        <p id="status" class="status muted"></p>
+      </section>
+
+      <section class="panel">
+        <div class="section-title">
+          <h2>Latest result</h2>
+          <a href="/api/entries/export" target="_blank" rel="noreferrer">Export JSON</a>
+        </div>
+        <div id="result" class="result muted">No screenshot processed yet.</div>
+      </section>
+
+      <section class="panel">
+        <div class="section-title">
+          <h2>Recent screenshots</h2>
+        </div>
+        <div id="history" class="history muted">Nothing here yet.</div>
+      </section>
+    </main>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

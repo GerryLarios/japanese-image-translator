@@ -1,0 +1,6 @@
+node_modules
+.DS_Store
+data/uploads/*
+data/screenshots/*
+!data/uploads/.gitkeep
+!data/screenshots/.gitkeep

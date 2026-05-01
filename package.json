@@ -1,0 +1,25 @@
+{
+  "name": "japanse-image-translator",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local Node.js app for OCR and translation of Japanese game screenshots.",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "dependencies": {
+    "@fastify/multipart": "^8.3.1",
+    "@fastify/static": "^7.0.4",
+    "dotenv": "^16.4.5",
+    "fastify": "^4.28.1",
+    "kuromoji": "^0.1.2",
+    "kuroshiro": "^1.2.0",
+    "kuroshiro-analyzer-kuromoji": "^1.1.0",
+    "tesseract.js": "^5.1.1",
+    "wanakana": "^5.3.1"
+  }
+}
