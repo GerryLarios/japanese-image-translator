@@ -54,7 +54,9 @@ If you have not loaded it in your current terminal yet:
 source ~/.zshrc
 ```
 
-Open `http://localhost:3000`.
+Open `http://localhost:3000` on the same Mac.
+
+If another device on your local network needs to reach the receiver running on this Mac, use the Mac's LAN address instead, for example `http://192.168.1.50:3000`.
 
 You can upload a screenshot, paste an image into the form, or paste Japanese text directly. If both image and text are provided, the pasted text is used and the image is kept only as a visual reference.
 
@@ -77,6 +79,8 @@ curl -X POST http://localhost:3000/api/upload \
   -F image=@/path/to/screenshot.png
 ```
 
+If the sender is running on another device, replace `localhost` with this Mac's LAN address, for example `http://192.168.1.50:3000/api/upload`.
+
 ### Batch upload every screenshot in a folder
 
 ```bash
@@ -93,6 +97,8 @@ done
 ```
 
 This sends screenshots one by one through the same OCR and Ollama pipeline used by the web UI.
+
+If you run that command from another device, change `http://localhost:3000` to this Mac's LAN address.
 
 ### Upload pasted text
 
