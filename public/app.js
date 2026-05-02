@@ -21,10 +21,14 @@ const imageLightbox = document.getElementById('image-lightbox');
 const lightboxImage = document.getElementById('lightbox-image');
 const lightboxTitle = document.getElementById('lightbox-title');
 const lightboxCloseButton = document.getElementById('lightbox-close');
+const entriesModal = document.getElementById('entries-modal');
+const entriesModalTitle = document.getElementById('entries-modal-title');
+const entriesModalMeta = document.getElementById('entries-modal-meta');
+const entriesModalBody = document.getElementById('entries-modal-body');
+const entriesModalCloseButton = document.getElementById('entries-modal-close');
 
 const API_KEY_STORAGE_KEY = 'jp-translator-api-key';
 const HISTORY_LINES_PREVIEW_LIMIT = 4;
-const HISTORY_ENTRIES_PREVIEW_LIMIT = 6;
 const JOBS_POLL_INTERVAL_MS = 1500;
 
 let activeJobId = null;
@@ -35,6 +39,8 @@ let clipboardImage = null;
 let apiKeyRequired = false;
 let apiKey = window.localStorage.getItem(API_KEY_STORAGE_KEY) ?? '';
 let activeJobsSignature = '';
+let historyItemsById = new Map();
+let activeEntriesModalScreenshotId = null;
 
 apiKeyInput.value = apiKey;
 
@@ -171,6 +177,18 @@ function formatSourceLabel(source) {
   return source === 'pasted-text' || source === 'text' ? 'Text request' : 'Screenshot';
 }
 
+function formatImageSize(width, height) {
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    return 'Full size unavailable';
+  }
+
+  return `Full size: ${width} x ${height}px`;
+}
+
+function setDocumentModalState(isOpen) {
+  document.body.style.overflow = isOpen ? 'hidden' : '';
+}
+
 function openImageLightbox(imageUrl, imageName) {
   if (!imageUrl) {
     return;
@@ -180,7 +198,7 @@ function openImageLightbox(imageUrl, imageName) {
   lightboxImage.alt = imageName ? `Expanded preview for ${imageName}` : 'Expanded screenshot preview';
   lightboxTitle.textContent = imageName || 'Screenshot preview';
   imageLightbox.classList.remove('hidden');
-  document.body.style.overflow = 'hidden';
+  setDocumentModalState(true);
 }
 
 function closeImageLightbox() {
@@ -188,7 +206,202 @@ function closeImageLightbox() {
   lightboxImage.removeAttribute('src');
   lightboxImage.alt = 'Expanded screenshot preview';
   lightboxTitle.textContent = 'Screenshot preview';
-  document.body.style.overflow = '';
+  setDocumentModalState(false);
+}
+
+function renderEntriesTable(entries) {
+  const rows = (entries ?? [])
+    .map(
+      (entry) => `
+        <tr>
+          <td class="table-checkbox-cell">
+            <input
+              type="checkbox"
+              class="table-checkbox"
+              data-entry-select
+              value="${escapeHtml(entry.id)}"
+              aria-label="Select ${escapeHtml(entry.id)}"
+            />
+          </td>
+          <td>${escapeHtml(entry.id)}</td>
+          <td>${escapeHtml(entry.japanese)}</td>
+          <td>${escapeHtml(entry.hiragana)}</td>
+          <td>${escapeHtml(entry.romaji)}</td>
+          <td>${escapeHtml(entry.english)}</td>
+          <td>${escapeHtml(entry.spanish)}</td>
+          <td>${escapeHtml(entry.type)}</td>
+        </tr>
+      `
+    )
+    .join('');
+
+  return `
+    <div class="entries-table-panel" data-entries-panel>
+      <div class="entries-table-toolbar">
+        <p class="entries-selection-summary muted" data-selection-summary>No entries selected.</p>
+        <div class="entries-table-actions">
+          <button type="button" class="secondary-button" data-toggle-entry-selection>Select all</button>
+          <button type="button" class="table-action-button" data-discard-selected disabled>Discard selected</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Select</th>
+              <th>ID</th>
+              <th>Japanese</th>
+              <th>Hiragana</th>
+              <th>Romaji</th>
+              <th>English</th>
+              <th>Spanish</th>
+              <th>Type</th>
+            </tr>
+          </thead>
+          <tbody>${rows || '<tr><td colspan="8">No entries generated.</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function openEntriesModal(item) {
+  if (!item) {
+    return;
+  }
+
+  activeEntriesModalScreenshotId = item.id ?? null;
+  entriesModalTitle.textContent = item.name || item.id || 'Saved entries';
+  entriesModalMeta.textContent = `${item.id} • ${item.entries?.length ?? 0} entr${item.entries?.length === 1 ? 'y' : 'ies'}`;
+  entriesModalBody.innerHTML = renderEntriesTable(item.entries);
+  entriesModal.classList.remove('hidden');
+  setDocumentModalState(true);
+  initializeEntriesPanels(entriesModalBody);
+}
+
+function closeEntriesModal() {
+  activeEntriesModalScreenshotId = null;
+  entriesModal.classList.add('hidden');
+  entriesModalTitle.textContent = 'Saved entries';
+  entriesModalMeta.textContent = '';
+  entriesModalBody.innerHTML = '';
+  setDocumentModalState(false);
+}
+
+function getSelectedEntryIds(panelNode) {
+  if (!panelNode) {
+    return [];
+  }
+
+  return [...panelNode.querySelectorAll('[data-entry-select]:checked')].map((input) => input.value);
+}
+
+function updateEntriesSelectionState(panelNode) {
+  if (!panelNode) {
+    return;
+  }
+
+  const selectedEntryIds = getSelectedEntryIds(panelNode);
+  const allCheckboxes = [...panelNode.querySelectorAll('[data-entry-select]')];
+  const summaryNode = panelNode.querySelector('[data-selection-summary]');
+  const toggleButton = panelNode.querySelector('[data-toggle-entry-selection]');
+  const discardButton = panelNode.querySelector('[data-discard-selected]');
+  const allSelected = allCheckboxes.length > 0 && selectedEntryIds.length === allCheckboxes.length;
+
+  if (summaryNode) {
+    summaryNode.textContent = selectedEntryIds.length
+      ? `${selectedEntryIds.length} entr${selectedEntryIds.length === 1 ? 'y' : 'ies'} selected.`
+      : 'No entries selected.';
+  }
+
+  if (toggleButton) {
+    toggleButton.textContent = allSelected ? 'Deselect all' : 'Select all';
+    toggleButton.disabled = allCheckboxes.length === 0;
+  }
+
+  if (discardButton) {
+    discardButton.disabled = selectedEntryIds.length === 0;
+  }
+}
+
+function toggleEntrySelection(panelNode) {
+  if (!panelNode) {
+    return;
+  }
+
+  const checkboxes = [...panelNode.querySelectorAll('[data-entry-select]')];
+  const shouldSelectAll = checkboxes.some((checkbox) => !checkbox.checked);
+  checkboxes.forEach((checkbox) => {
+    checkbox.checked = shouldSelectAll;
+  });
+  updateEntriesSelectionState(panelNode);
+}
+
+function initializeEntriesPanels(scope) {
+  scope.querySelectorAll('[data-entries-panel]').forEach((panelNode) => {
+    updateEntriesSelectionState(panelNode);
+  });
+}
+
+async function refreshEntryViews() {
+  await loadHistory();
+
+  if (latestResultId) {
+    const latestItem = historyItemsById.get(latestResultId);
+    if (latestItem) {
+      renderResult(latestItem);
+    }
+  }
+
+  if (!entriesModal.classList.contains('hidden') && activeEntriesModalScreenshotId) {
+    const activeItem = historyItemsById.get(activeEntriesModalScreenshotId);
+    if (activeItem) {
+      openEntriesModal(activeItem);
+      return;
+    }
+
+    closeEntriesModal();
+  }
+}
+
+function attachImageSizeLabel(imageNode) {
+  if (!imageNode) {
+    return;
+  }
+
+  const targetSelector = imageNode.dataset.sizeTarget;
+  if (!targetSelector) {
+    return;
+  }
+
+  const targetNode = document.querySelector(targetSelector);
+  if (!targetNode) {
+    return;
+  }
+
+  const updateSize = () => {
+    targetNode.textContent = formatImageSize(imageNode.naturalWidth, imageNode.naturalHeight);
+  };
+
+  if (imageNode.complete) {
+    updateSize();
+    return;
+  }
+
+  imageNode.addEventListener('load', updateSize, { once: true });
+  imageNode.addEventListener(
+    'error',
+    () => {
+      targetNode.textContent = 'Full size unavailable';
+    },
+    { once: true }
+  );
+}
+
+function attachImageSizeLabels(scope) {
+  scope.querySelectorAll('img[data-size-target]').forEach((imageNode) => {
+    attachImageSizeLabel(imageNode);
+  });
 }
 
 function renderResult(payload) {
@@ -214,24 +427,18 @@ function renderResult(payload) {
     )
     .join('');
 
-  const entries = (payload.entries ?? [])
-    .map(
-      (entry) => `
-        <tr>
-          <td>${escapeHtml(entry.id)}</td>
-          <td>${escapeHtml(entry.japanese)}</td>
-          <td>${escapeHtml(entry.hiragana)}</td>
-          <td>${escapeHtml(entry.romaji)}</td>
-          <td>${escapeHtml(entry.english)}</td>
-          <td>${escapeHtml(entry.spanish)}</td>
-          <td>${escapeHtml(entry.type)}</td>
-        </tr>
-      `
-    )
-    .join('');
-
   const preview = payload.imageUrl
-    ? `<img class="preview" src="${escapeHtml(payload.imageUrl)}" alt="${escapeHtml(payload.name || payload.id)}" />`
+    ? `
+      <div class="result-preview">
+        <img
+          class="preview"
+          src="${escapeHtml(payload.imageUrl)}"
+          alt="${escapeHtml(payload.name || payload.id)}"
+          data-size-target="#result-image-size"
+        />
+        <p id="result-image-size" class="muted image-size-label">Full size unavailable</p>
+      </div>
+    `
     : `<div class="preview preview-text"><strong>No image uploaded</strong><span>Used plain text directly.</span></div>`;
 
   resultNode.innerHTML = `
@@ -247,51 +454,36 @@ function renderResult(payload) {
       </div>
       <div>
         <h3>Saved entries</h3>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Japanese</th>
-                <th>Hiragana</th>
-                <th>Romaji</th>
-                <th>English</th>
-                <th>Spanish</th>
-                <th>Type</th>
-              </tr>
-            </thead>
-            <tbody>${entries || '<tr><td colspan="7">No entries generated.</td></tr>'}</tbody>
-          </table>
-        </div>
+        ${renderEntriesTable(payload.entries)}
       </div>
     </div>
   `;
+
+  attachImageSizeLabels(resultNode);
+  initializeEntriesPanels(resultNode);
 }
 
 function renderHistory(items) {
   if (!items.length) {
+    historyItemsById = new Map();
     historyNode.innerHTML = '<p class="muted">Nothing here yet.</p>';
     return;
   }
 
+  historyItemsById = new Map(items.map((item) => [item.id, item]));
   historyNode.innerHTML = items
     .map((item) => {
       const previewLines = (item.lines ?? []).slice(0, HISTORY_LINES_PREVIEW_LIMIT);
-      const previewEntries = (item.entries ?? []).slice(0, HISTORY_ENTRIES_PREVIEW_LIMIT);
       const imageMarkup = item.imageUrl
         ? `
-          <div>
-            <button
-              type="button"
-              class="history-image-button"
-              data-zoom-image="${escapeHtml(item.imageUrl)}"
-              data-zoom-name="${escapeHtml(item.name || item.id)}"
-              aria-label="Open larger preview for ${escapeHtml(item.name || item.id)}"
-              title="Click to zoom"
-            >
-              <img src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.name || item.id)}" />
-            </button>
-            <span class="history-image-hint muted">Click to zoom</span>
+          <div class="history-image-panel">
+            <img
+              src="${escapeHtml(item.imageUrl)}"
+              alt="${escapeHtml(item.name || item.id)}"
+              class="history-full-image"
+              data-size-target="#history-image-size-${escapeHtml(item.id)}"
+            />
+            <span id="history-image-size-${escapeHtml(item.id)}" class="history-image-size muted">Full size unavailable</span>
           </div>
         `
         : '<div class="history-placeholder">TXT</div>';
@@ -322,6 +514,17 @@ function renderHistory(items) {
             </div>
 
             <div class="history-sections">
+              ${
+                truncatedRawText
+                  ? `
+                    <section class="history-section">
+                      <h4>Raw text</h4>
+                      <p class="history-raw-text">${escapeHtml(truncatedRawText)}</p>
+                    </section>
+                  `
+                  : ''
+              }
+
               <section class="history-section">
                 <h4>Lines</h4>
                 ${
@@ -351,53 +554,34 @@ function renderHistory(items) {
               </section>
 
               <section class="history-section">
-                <h4>Entries</h4>
-                ${
-                  previewEntries.length
-                    ? `
-                      <div class="history-entries">
-                        ${previewEntries
-                          .map(
-                            (entry) => `
-                              <article class="history-entry">
-                                <div class="history-entry-grid">
-                                  <span>ID</span><strong>${escapeHtml(entry.id)}</strong>
-                                  <span>Japanese</span><strong>${escapeHtml(entry.japanese)}</strong>
-                                  <span>English</span><strong>${escapeHtml(entry.english)}</strong>
-                                  <span>Spanish</span><strong>${escapeHtml(entry.spanish)}</strong>
-                                  <span>Type</span><strong>${escapeHtml(entry.type)}</strong>
-                                </div>
-                              </article>
-                            `
-                          )
-                          .join('')}
-                        ${
-                          (item.entries?.length ?? 0) > previewEntries.length
-                            ? `<p class="muted">+${escapeHtml(String(item.entries.length - previewEntries.length))} more entr${item.entries.length - previewEntries.length === 1 ? 'y' : 'ies'}</p>`
-                            : ''
-                        }
-                      </div>
-                    `
-                    : '<p class="muted">No entries saved.</p>'
-                }
+                <div class="history-section-header">
+                  <h4>Entries</h4>
+                  ${
+                    item.entries?.length
+                      ? `
+                        <button
+                          type="button"
+                          class="secondary-button"
+                          data-show-entries="${escapeHtml(item.id)}"
+                        >
+                          Show full list
+                        </button>
+                      `
+                      : ''
+                  }
+                </div>
+                <p class="muted">
+                  ${escapeHtml(String(item.entries?.length ?? 0))} entr${item.entries?.length === 1 ? 'y is' : 'ies are'} saved for this screenshot.
+                </p>
               </section>
-
-              ${
-                truncatedRawText
-                  ? `
-                    <section class="history-section">
-                      <h4>Raw text</h4>
-                      <p class="history-raw-text">${escapeHtml(truncatedRawText)}</p>
-                    </section>
-                  `
-                  : ''
-              }
             </div>
           </div>
         </article>
       `;
     })
     .join('');
+
+  attachImageSizeLabels(historyNode);
 }
 
 function renderJobs(items) {
@@ -457,6 +641,41 @@ async function deleteScreenshot(screenshotId) {
 
   await loadHistory();
   setStatus(`Removed ${payload.id} and ${payload.removedEntries} saved entries.`);
+}
+
+async function discardEntries(entryIds) {
+  const uniqueEntryIds = [...new Set(entryIds.map((entryId) => String(entryId).trim()).filter(Boolean))];
+  if (!uniqueEntryIds.length) {
+    return;
+  }
+
+  const confirmed = window.confirm(
+    `Discard ${uniqueEntryIds.length} selected entr${uniqueEntryIds.length === 1 ? 'y' : 'ies'} everywhere ${uniqueEntryIds.length === 1 ? 'it appears' : 'they appear'}?`
+  );
+  if (!confirmed) {
+    return;
+  }
+
+  setStatus('');
+  const response = await apiFetch('/api/entries/discard', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json'
+    },
+    body: JSON.stringify({
+      entryIds: uniqueEntryIds
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, 'Could not discard selected entries.'));
+  }
+
+  const payload = await response.json();
+  await refreshEntryViews();
+  setStatus(
+    `Discarded ${payload.removedEntries} entr${payload.removedEntries === 1 ? 'y' : 'ies'} from ${payload.removedFrom} screenshot${payload.removedFrom === 1 ? '' : 's'}.`
+  );
 }
 
 async function nukeAllData() {
@@ -738,9 +957,67 @@ authForm.addEventListener('submit', (event) => {
     });
 });
 
+resultNode.addEventListener('change', (event) => {
+  const checkbox = event.target.closest('[data-entry-select]');
+  if (!checkbox) {
+    return;
+  }
+
+  updateEntriesSelectionState(checkbox.closest('[data-entries-panel]'));
+});
+
+entriesModalBody.addEventListener('change', (event) => {
+  const checkbox = event.target.closest('[data-entry-select]');
+  if (!checkbox) {
+    return;
+  }
+
+  updateEntriesSelectionState(checkbox.closest('[data-entries-panel]'));
+});
+
+resultNode.addEventListener('click', (event) => {
+  const toggleButton = event.target.closest('[data-toggle-entry-selection]');
+  if (toggleButton) {
+    toggleEntrySelection(toggleButton.closest('[data-entries-panel]'));
+    return;
+  }
+
+  const discardButton = event.target.closest('[data-discard-selected]');
+  if (!discardButton) {
+    return;
+  }
+
+  discardEntries(getSelectedEntryIds(discardButton.closest('[data-entries-panel]'))).catch((error) => {
+    setStatus(error.message, true);
+  });
+});
+
+entriesModalBody.addEventListener('click', (event) => {
+  const toggleButton = event.target.closest('[data-toggle-entry-selection]');
+  if (toggleButton) {
+    toggleEntrySelection(toggleButton.closest('[data-entries-panel]'));
+    return;
+  }
+
+  const discardButton = event.target.closest('[data-discard-selected]');
+  if (!discardButton) {
+    return;
+  }
+
+  discardEntries(getSelectedEntryIds(discardButton.closest('[data-entries-panel]'))).catch((error) => {
+    setStatus(error.message, true);
+  });
+});
+
 historyNode.addEventListener('click', (event) => {
   const button = event.target.closest('[data-delete-screenshot]');
   if (!button) {
+    const entriesButton = event.target.closest('[data-show-entries]');
+    if (entriesButton) {
+      openEntriesModal(historyItemsById.get(entriesButton.dataset.showEntries));
+      return;
+    }
+
     const zoomButton = event.target.closest('[data-zoom-image]');
     if (!zoomButton) {
       return;
@@ -756,6 +1033,7 @@ historyNode.addEventListener('click', (event) => {
 });
 
 lightboxCloseButton.addEventListener('click', closeImageLightbox);
+entriesModalCloseButton.addEventListener('click', closeEntriesModal);
 
 imageLightbox.addEventListener('click', (event) => {
   if (event.target === imageLightbox) {
@@ -763,7 +1041,18 @@ imageLightbox.addEventListener('click', (event) => {
   }
 });
 
+entriesModal.addEventListener('click', (event) => {
+  if (event.target === entriesModal) {
+    closeEntriesModal();
+  }
+});
+
 document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !entriesModal.classList.contains('hidden')) {
+    closeEntriesModal();
+    return;
+  }
+
   if (event.key === 'Escape' && !imageLightbox.classList.contains('hidden')) {
     closeImageLightbox();
   }

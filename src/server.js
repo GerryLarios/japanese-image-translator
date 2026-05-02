@@ -10,6 +10,8 @@ import { shutdownWorker } from './services/ocr.js';
 import { processScreenshot } from './services/pipeline.js';
 import {
   clearGeneratedData,
+  deleteEntryRecord,
+  deleteEntryRecords,
   deleteScreenshotRecord,
   ensureDataFiles,
   listScreenshotHistory,
@@ -17,8 +19,26 @@ import {
   loadScreenshotIndex
 } from './services/storage.js';
 
+function createLoggerOptions() {
+  if (!process.stdout.isTTY) {
+    return true;
+  }
+
+  return {
+    transport: {
+      target: 'pino-pretty',
+      options: {
+        colorize: true,
+        translateTime: 'SYS:HH:MM:ss',
+        ignore: 'pid,hostname',
+        singleLine: true
+      }
+    }
+  };
+}
+
 const app = fastify({
-  logger: true
+  logger: createLoggerOptions()
 });
 
 await ensureDataFiles();
@@ -139,6 +159,29 @@ app.get('/api/entries/export', async (_, reply) => {
   const items = await loadEntries();
   reply.header('Content-Disposition', 'attachment; filename="entries.json"');
   return items;
+});
+
+app.delete('/api/entries/:entryId', async (request, reply) => {
+  const deleted = await deleteEntryRecord(request.params.entryId);
+
+  if (!deleted) {
+    reply.code(404);
+    return { message: 'Entry not found.' };
+  }
+
+  return deleted;
+});
+
+app.post('/api/entries/discard', async (request, reply) => {
+  const entryIds = Array.isArray(request.body?.entryIds) ? request.body.entryIds : [];
+  const deleted = await deleteEntryRecords(entryIds);
+
+  if (!deleted) {
+    reply.code(404);
+    return { message: 'No matching entries found.' };
+  }
+
+  return deleted;
 });
 
 async function parseUploadRequest(request) {
@@ -285,6 +328,25 @@ function getLanUrls(port) {
     .map((address) => `http://${address}:${port}`);
 }
 
+function logStartupDetails() {
+  const lanUrls = getLanUrls(PORT);
+
+  app.log.info('='.repeat(48));
+  app.log.info('Receiver ready');
+  app.log.info(`Local URL : http://localhost:${PORT}`);
+
+  if (!lanUrls.length) {
+    app.log.info('LAN URLs  : none detected');
+  }
+
+  for (const [index, lanUrl] of lanUrls.entries()) {
+    app.log.info(`LAN URL ${index + 1}: ${lanUrl}`);
+  }
+
+  app.log.info(`API key   : ${API_KEY ? 'enabled' : 'disabled'}`);
+  app.log.info('='.repeat(48));
+}
+
 const closeApp = async () => {
   await shutdownWorker();
   await app.close();
@@ -305,12 +367,4 @@ await app.listen({
   host: '0.0.0.0'
 });
 
-app.log.info(`japanse-image-translator running at http://localhost:${PORT}`);
-
-for (const lanUrl of getLanUrls(PORT)) {
-  app.log.info(`japanse-image-translator reachable on your LAN at ${lanUrl}`);
-}
-
-if (API_KEY) {
-  app.log.info('API key protection is enabled for /api routes.');
-}
+logStartupDetails();

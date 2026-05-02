@@ -164,6 +164,17 @@ button {
   text-align: center;
 }
 
+.result-preview {
+  display: grid;
+  gap: 8px;
+}
+
+.image-size-label,
+.history-image-size {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
 .ocr {
   white-space: pre-wrap;
   background: #020617;
@@ -183,7 +194,7 @@ button {
 .history-item {
   position: relative;
   display: grid;
-  grid-template-columns: 160px 1fr;
+  grid-template-columns: 1fr;
   gap: 16px;
   margin-bottom: 16px;
   align-items: start;
@@ -210,26 +221,27 @@ button {
   border-color: #b91c1c;
 }
 
-.history-image-button {
-  padding: 0;
-  border: 1px solid #334155;
-  background: #0f172a;
-  overflow: hidden;
-  cursor: zoom-in;
+.history-image-panel {
+  display: grid;
+  gap: 8px;
 }
 
 .history-item img {
   width: 100%;
   border-radius: 10px;
   object-fit: contain;
-  max-height: 140px;
+  max-height: none;
   background: #fff;
+  border: 1px solid #334155;
 }
 
-.history-image-hint {
-  display: inline-block;
-  margin-top: 8px;
-  font-size: 0.85rem;
+.history-full-image {
+  display: block;
+}
+
+.history-image-size {
+  display: block;
+  margin-top: 0;
 }
 
 .history-meta,
@@ -251,6 +263,13 @@ button {
 
 .history-sections {
   display: grid;
+  gap: 12px;
+}
+
+.history-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 12px;
 }
 
@@ -282,7 +301,9 @@ button {
 .history-line p,
 .history-entry p,
 .job-item p,
-.history-content h3 {
+.history-content h3,
+.modal-header p,
+.modal-header h2 {
   margin: 0;
 }
 
@@ -329,6 +350,13 @@ button {
   color: #cbd5e1;
 }
 
+.secondary-button {
+  background: #0f172a;
+  border-color: #334155;
+  color: #bfdbfe;
+}
+
+.modal,
 .lightbox {
   position: fixed;
   inset: 0;
@@ -344,12 +372,25 @@ button {
   display: none;
 }
 
+.modal.hidden {
+  display: none;
+}
+
+.modal-content,
 .lightbox-content {
   position: relative;
   width: min(1100px, 100%);
   max-height: calc(100vh - 48px);
   display: grid;
   gap: 12px;
+}
+
+.modal-content {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 16px;
+  padding: 24px;
+  overflow: hidden;
 }
 
 .lightbox-title {
@@ -365,6 +406,7 @@ button {
   background: #fff;
 }
 
+.modal-close,
 .lightbox-close {
   position: absolute;
   top: 24px;
@@ -379,6 +421,16 @@ button {
   line-height: 1;
   background: rgba(127, 29, 29, 0.95);
   border-color: #b91c1c;
+}
+
+.modal-header {
+  display: grid;
+  gap: 6px;
+  padding-right: 56px;
+}
+
+.modal-body {
+  overflow: auto;
 }
 
 .history-placeholder {
@@ -397,6 +449,28 @@ button {
   overflow-x: auto;
 }
 
+.entries-table-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.entries-table-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.entries-table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.entries-selection-summary {
+  margin: 0;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -410,10 +484,38 @@ td {
   vertical-align: top;
 }
 
+.table-checkbox-cell {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.table-checkbox {
+  width: 18px;
+  height: 18px;
+  accent-color: #2563eb;
+}
+
+.table-action-button {
+  padding: 8px 12px;
+  background: #7f1d1d;
+  border-color: #b91c1c;
+}
+
+.table-action-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 @media (max-width: 720px) {
   .input-grid,
   .history-entry-grid {
     grid-template-columns: 1fr;
+  }
+
+  .entries-table-toolbar,
+  .history-section-header {
+    align-items: start;
+    flex-direction: column;
   }
 
   .history-item {

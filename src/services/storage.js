@@ -202,6 +202,79 @@ export async function saveScreenshotRecord(record) {
   await writeJson(SCREENSHOT_INDEX_FILE, index);
 }
 
+export async function deleteEntryRecords(entryIds) {
+  const uniqueEntryIds = [...new Set(entryIds.map((entryId) => String(entryId).trim()).filter(Boolean))];
+  if (!uniqueEntryIds.length) {
+    return {
+      removedEntryIds: [],
+      removedEntries: 0,
+      removedFrom: 0,
+      affectedScreenshots: []
+    };
+  }
+
+  const currentEntries = await loadEntries();
+  const entryIdSet = new Set(uniqueEntryIds);
+  const removedEntryIds = currentEntries
+    .filter((entry) => entryIdSet.has(entry.id))
+    .map((entry) => entry.id);
+
+  if (!removedEntryIds.length) {
+    return null;
+  }
+
+  const remainingEntries = currentEntries.filter((entry) => !entryIdSet.has(entry.id));
+  const index = await loadScreenshotIndex();
+  const updatedIndex = [];
+  const affectedScreenshots = [];
+
+  for (const item of index) {
+    const record = await loadScreenshotRecord(item.id);
+    const existingEntries = record?.entries ?? [];
+    const nextEntries = existingEntries.filter((entry) => !entryIdSet.has(entry.id));
+
+    if (!record || nextEntries.length === existingEntries.length) {
+      updatedIndex.push(item);
+      continue;
+    }
+
+    const detailPath = path.join(SCREENSHOTS_DIR, `${item.id}.json`);
+    await writeJson(detailPath, {
+      ...record,
+      entries: nextEntries
+    });
+
+    updatedIndex.push({
+      ...item,
+      entriesCount: nextEntries.length
+    });
+    affectedScreenshots.push(item.id);
+  }
+
+  await saveEntries(remainingEntries);
+  await writeJson(SCREENSHOT_INDEX_FILE, updatedIndex);
+
+  return {
+    removedEntryIds,
+    removedEntries: removedEntryIds.length,
+    removedFrom: affectedScreenshots.length,
+    affectedScreenshots
+  };
+}
+
+export async function deleteEntryRecord(entryId) {
+  const deleted = await deleteEntryRecords([entryId]);
+  if (!deleted) {
+    return null;
+  }
+
+  return {
+    id: entryId,
+    removedFrom: deleted.removedFrom,
+    affectedScreenshots: deleted.affectedScreenshots
+  };
+}
+
 export async function deleteScreenshotRecord(screenshotId) {
   const record = await loadScreenshotRecord(screenshotId);
 
