@@ -1,8 +1,8 @@
 {
-  "name": "rog-ally-sender-example",
+  "name": "sender-example",
   "private": true,
   "version": "0.1.0",
-  "description": "Example Windows sender for japanse-image-translator.",
+  "description": "Example folder-watching sender for japanse-image-translator.",
   "scripts": {
     "start": "node sender.js"
   },

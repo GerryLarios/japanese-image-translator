@@ -9,6 +9,7 @@ const path = require('path');
 const SCREENSHOT_DIR = process.env.SCREENSHOT_DIR || 'C:\\Path\\To\\Screenshots';
 const SERVER_URL = process.env.SERVER_URL || 'http://192.168.1.50:3000/api/upload';
 const LESSON = process.env.LESSON || '1';
+const API_KEY = (process.env.API_KEY || '').trim();
 
 const watcher = chokidar.watch(SCREENSHOT_DIR, {
   ignoreInitial: true,
@@ -24,7 +25,10 @@ async function sendFile(filePath) {
   form.append('image', fs.createReadStream(filePath));
 
   const response = await axios.post(SERVER_URL, form, {
-    headers: form.getHeaders(),
+    headers: {
+      ...form.getHeaders(),
+      ...(API_KEY ? { 'x-api-key': API_KEY } : {})
+    },
     maxBodyLength: Infinity
   });
 

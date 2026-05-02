@@ -36,6 +36,18 @@ body {
   margin-top: 20px;
 }
 
+.input-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.auth-form {
+  display: grid;
+  gap: 16px;
+  margin-top: 20px;
+}
+
 label {
   display: grid;
   gap: 8px;
@@ -88,7 +100,8 @@ button {
 }
 
 .result-stack,
-.cards {
+.cards,
+.jobs-list {
   display: grid;
   gap: 16px;
 }
@@ -124,6 +137,10 @@ button {
 
 .progress-message {
   margin: 0;
+}
+
+.status {
+  margin-bottom: 0;
 }
 
 .error-state .progress-bar {
@@ -169,10 +186,13 @@ button {
   grid-template-columns: 160px 1fr;
   gap: 16px;
   margin-bottom: 16px;
+  align-items: start;
 }
 
 .history-content {
   padding-right: 56px;
+  display: grid;
+  gap: 12px;
 }
 
 .history-delete-button {
@@ -190,11 +210,175 @@ button {
   border-color: #b91c1c;
 }
 
+.history-image-button {
+  padding: 0;
+  border: 1px solid #334155;
+  background: #0f172a;
+  overflow: hidden;
+  cursor: zoom-in;
+}
+
 .history-item img {
   width: 100%;
   border-radius: 10px;
-  object-fit: cover;
-  max-height: 120px;
+  object-fit: contain;
+  max-height: 140px;
+  background: #fff;
+}
+
+.history-image-hint {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 0.85rem;
+}
+
+.history-meta,
+.job-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.history-meta span,
+.job-meta span {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.12);
+  border: 1px solid rgba(96, 165, 250, 0.2);
+  color: #bfdbfe;
+  font-size: 0.9rem;
+}
+
+.history-sections {
+  display: grid;
+  gap: 12px;
+}
+
+.history-section {
+  display: grid;
+  gap: 8px;
+}
+
+.history-section h4,
+.job-item h3 {
+  margin: 0;
+}
+
+.history-lines,
+.history-entries {
+  display: grid;
+  gap: 8px;
+}
+
+.history-line,
+.history-entry,
+.job-item {
+  border-radius: 10px;
+  border: 1px solid #1e293b;
+  background: rgba(15, 23, 42, 0.9);
+  padding: 12px;
+}
+
+.history-line p,
+.history-entry p,
+.job-item p,
+.history-content h3 {
+  margin: 0;
+}
+
+.history-line-translation {
+  margin-top: 6px;
+}
+
+.history-entry-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+}
+
+.history-entry-grid span {
+  color: #94a3b8;
+}
+
+.history-entry-grid strong {
+  color: #e2e8f0;
+}
+
+.history-raw-text {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: 0.95rem;
+  color: #cbd5e1;
+}
+
+.job-item {
+  display: grid;
+  gap: 10px;
+}
+
+.job-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.job-progress {
+  margin: 0;
+  color: #cbd5e1;
+}
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(2, 6, 23, 0.84);
+  backdrop-filter: blur(6px);
+}
+
+.lightbox.hidden {
+  display: none;
+}
+
+.lightbox-content {
+  position: relative;
+  width: min(1100px, 100%);
+  max-height: calc(100vh - 48px);
+  display: grid;
+  gap: 12px;
+}
+
+.lightbox-title {
+  margin: 0;
+}
+
+.lightbox-image {
+  width: 100%;
+  max-height: calc(100vh - 120px);
+  object-fit: contain;
+  border-radius: 16px;
+  border: 1px solid #334155;
+  background: #fff;
+}
+
+.lightbox-close {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  z-index: 1;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  font-size: 28px;
+  line-height: 1;
+  background: rgba(127, 29, 29, 0.95);
+  border-color: #b91c1c;
 }
 
 .history-placeholder {
@@ -227,6 +411,11 @@ td {
 }
 
 @media (max-width: 720px) {
+  .input-grid,
+  .history-entry-grid {
+    grid-template-columns: 1fr;
+  }
+
   .history-item {
     grid-template-columns: 1fr;
   }

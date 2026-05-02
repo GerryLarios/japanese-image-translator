@@ -36,6 +36,12 @@ cp .env.example .env
 ollama serve
 ```
 
+If you want only devices with the shared key to use the API, set this in `.env`:
+
+```bash
+API_KEY=replace-this-with-a-long-random-secret
+```
+
 ## Run
 
 ```bash
@@ -45,7 +51,7 @@ npm start
 Or use the shell alias:
 
 ```bash
-start-jp-translator
+start-jp-receiver
 ```
 
 If you have not loaded it in your current terminal yet:
@@ -58,7 +64,11 @@ Open `http://localhost:3000` on the same Mac.
 
 If another device on your local network needs to reach the receiver running on this Mac, use the Mac's LAN address instead, for example `http://192.168.1.50:3000`.
 
+On startup, the server logs the `localhost` URL and any detected LAN URLs.
+
 You can upload a screenshot, paste an image into the form, or paste Japanese text directly. If both image and text are provided, the pasted text is used and the image is kept only as a visual reference.
+
+If `API_KEY` is configured, the browser UI will ask for it once per device and store it locally in that browser.
 
 ## UI workflow
 
@@ -70,12 +80,22 @@ You can upload a screenshot, paste an image into the form, or paste Japanese tex
 
 ## API
 
+If `API_KEY` is set, every `/api/*` request must include `x-api-key: <your-api-key>`.
+
+`lesson` is a free-form label, so it can be `1`, `genki-1`, `chapter-a`, or any other non-empty value.
+
+Example header:
+
+```bash
+-H "x-api-key: your-shared-key"
+```
+
 ### Upload a screenshot
 
 ```bash
 curl -X POST http://localhost:3000/api/upload \
   -F name="Persona 5 menu" \
-  -F lesson=1 \
+  -F lesson="genki-1" \
   -F image=@/path/to/screenshot.png
 ```
 
@@ -89,7 +109,7 @@ find "/Users/gerry/Desktop/screenshots" -type f \( \
 \) -print0 | while IFS= read -r -d '' file; do
   echo "Processing: $(basename "$file")"
   curl -sS -X POST http://localhost:3000/api/upload \
-    -F "lesson=1" \
+    -F "lesson=genki-1" \
     -F "name=$(basename "$file")" \
     -F "image=@$file"
   echo
@@ -105,7 +125,7 @@ If you run that command from another device, change `http://localhost:3000` to t
 ```bash
 curl -X POST http://localhost:3000/api/upload \
   -F name="Live Text capture" \
-  -F lesson=1 \
+  -F lesson="genki-1" \
   -F pastedText="一寸法師"
 ```
 
@@ -114,7 +134,7 @@ curl -X POST http://localhost:3000/api/upload \
 ```bash
 curl -X POST http://localhost:3000/api/upload/jobs \
   -F name="Live Text capture" \
-  -F lesson=1 \
+  -F lesson="genki-1" \
   -F pastedText="一寸法師"
 ```
 
@@ -142,14 +162,14 @@ curl -X DELETE http://localhost:3000/api/screenshots/shot-0001
 curl -X DELETE http://localhost:3000/api/data
 ```
 
-## ROG Ally sender example
+## Sender example
 
-The repository includes a Windows sender example in `examples/rog-ally-sender`. It watches a screenshot folder on your ROG Ally and posts each new image to the app running on your Mac.
+The repository includes a sender example in `examples/sender`. It watches a screenshot folder on any computer and posts each new image to the app running on your Mac.
 
-### Install the sender on the ROG Ally
+### Install the sender
 
 ```bash
-cd examples/rog-ally-sender
+cd examples/sender
 npm install
 ```
 
@@ -159,16 +179,18 @@ Copy `.env.example` and update:
 
 - `SCREENSHOT_DIR`: the Windows folder where your screenshots are saved
 - `SERVER_URL`: your Mac's local IP, for example `http://192.168.1.50:3000/api/upload`
-- `LESSON`: the lesson number to attach to uploaded entries
+- `LESSON`: the lesson label to attach to uploaded entries
+- `API_KEY`: the same shared key configured on the Mac when API key protection is enabled
 
 Example PowerShell session:
 
 ```powershell
-cd examples\rog-ally-sender
+cd examples\sender
 Copy-Item .env.example .env
 $env:SCREENSHOT_DIR="C:\Users\YourName\Pictures\Screenshots"
 $env:SERVER_URL="http://192.168.1.50:3000/api/upload"
 $env:LESSON="1"
+$env:API_KEY="your-shared-key"
 npm start
 ```
 

@@ -12,30 +12,48 @@
         <h1>japanse-image-translator</h1>
         <p class="muted">Upload a Japanese game screenshot and save structured English/Spanish study entries.</p>
 
+        <form id="auth-form" class="auth-form hidden">
+          <label>
+            <span>API key</span>
+            <input
+              id="api-key-input"
+              type="password"
+              name="apiKey"
+              placeholder="Enter the shared key for this device"
+              autocomplete="off"
+            />
+            <span class="muted">Required only when this receiver has API key protection enabled.</span>
+          </label>
+          <button type="submit">Save API key</button>
+        </form>
+
         <form id="upload-form" class="upload-form">
           <label>
             <span>Name</span>
             <input type="text" name="name" placeholder="Persona 5 menu screenshot" />
           </label>
 
-          <label>
-            <span>Screenshot</span>
-            <input type="file" name="image" accept="image/*" />
-            <span class="muted">Choose a file or paste an image anywhere in this form.</span>
-          </label>
+          <div class="input-grid">
+            <label>
+              <span>Screenshot</span>
+              <input type="file" name="image" accept="image/*" />
+              <span class="muted">Choose a file or paste an image anywhere in this form.</span>
+            </label>
 
-          <label>
-            <span>Pasted text</span>
-            <textarea
-              name="pastedText"
-              rows="5"
-              placeholder="Paste Japanese text copied from macOS Live Text here to skip OCR."
-            ></textarea>
-          </label>
+            <label>
+              <span>Japanese text</span>
+              <textarea
+                name="pastedText"
+                rows="8"
+                placeholder="Paste Japanese text here to translate without uploading an image."
+              ></textarea>
+              <span class="muted">Use this by itself for plain text, or combine it with a screenshot when OCR misses something.</span>
+            </label>
+          </div>
 
           <input type="hidden" name="lesson" value="1" />
 
-          <button type="submit">Process screenshot</button>
+          <button type="submit">Process screenshot or text</button>
         </form>
 
         <div id="progress-panel" class="progress-panel hidden" aria-live="polite">
@@ -52,10 +70,18 @@
         <p id="status" class="status muted"></p>
       </section>
 
+      <section id="jobs-panel" class="panel hidden">
+        <div class="section-title">
+          <h2>Processing now</h2>
+          <span id="jobs-summary" class="muted">No active jobs.</span>
+        </div>
+        <div id="jobs-list" class="jobs-list"></div>
+      </section>
+
       <section class="panel">
         <div class="section-title">
           <h2>Latest result</h2>
-          <a href="/api/entries/export" target="_blank" rel="noreferrer">Export JSON</a>
+          <a id="export-link" href="/api/entries/export" target="_blank" rel="noreferrer">Export JSON</a>
         </div>
         <div id="result" class="result muted">No screenshot processed yet.</div>
       </section>
@@ -68,6 +94,14 @@
         <div id="history" class="history muted">Nothing here yet.</div>
       </section>
     </main>
+
+    <div id="image-lightbox" class="lightbox hidden" role="dialog" aria-modal="true" aria-labelledby="lightbox-title">
+      <button id="lightbox-close" type="button" class="lightbox-close" aria-label="Close image preview">×</button>
+      <div class="lightbox-content">
+        <h2 id="lightbox-title" class="lightbox-title">Screenshot preview</h2>
+        <img id="lightbox-image" class="lightbox-image" alt="Expanded screenshot preview" />
+      </div>
+    </div>
 
     <script type="module" src="/app.js"></script>
   </body>

@@ -1,15 +1,18 @@
+import { timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
+import { networkInterfaces } from 'node:os';
 import fastify from 'fastify';
 import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
-import { PORT, PUBLIC_DIR, UPLOADS_DIR } from './config.js';
-import { completeJob, createJob, failJob, getJob, updateJob } from './services/jobs.js';
+import { API_KEY, PORT, PUBLIC_DIR, UPLOADS_DIR } from './config.js';
+import { completeJob, createJob, failJob, getJob, listJobs, updateJob } from './services/jobs.js';
 import { shutdownWorker } from './services/ocr.js';
 import { processScreenshot } from './services/pipeline.js';
 import {
   clearGeneratedData,
   deleteScreenshotRecord,
   ensureDataFiles,
+  listScreenshotHistory,
   loadEntries,
   loadScreenshotIndex
 } from './services/storage.js';
@@ -37,17 +40,63 @@ await app.register(fastifyStatic, {
   decorateReply: false
 });
 
+function getRequestApiKey(request) {
+  const xApiKey = request.headers['x-api-key'];
+  if (typeof xApiKey === 'string' && xApiKey.trim()) {
+    return xApiKey.trim();
+  }
+
+  const authorization = request.headers.authorization;
+  if (typeof authorization !== 'string') {
+    return '';
+  }
+
+  const [scheme, token] = authorization.split(' ');
+  if (scheme?.toLowerCase() !== 'bearer' || !token?.trim()) {
+    return '';
+  }
+
+  return token.trim();
+}
+
+function apiKeyMatches(providedKey) {
+  if (!API_KEY) {
+    return true;
+  }
+
+  const expected = Buffer.from(API_KEY);
+  const provided = Buffer.from(providedKey);
+  return expected.length === provided.length && timingSafeEqual(expected, provided);
+}
+
+app.addHook('onRequest', async (request, reply) => {
+  const pathname = request.url.split('?')[0];
+  if (!API_KEY || pathname === '/api/health' || !pathname.startsWith('/api/')) {
+    return;
+  }
+
+  if (apiKeyMatches(getRequestApiKey(request))) {
+    return;
+  }
+
+  reply.code(401);
+  return reply.send({
+    message: 'Invalid or missing API key.'
+  });
+});
+
 app.get('/', async (_, reply) => {
   const html = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
   reply.type('text/html').send(html);
 });
 
 app.get('/api/health', async () => ({
-  ok: true
+  ok: true,
+  apiKeyRequired: Boolean(API_KEY)
 }));
 
 app.get('/api/screenshots', async () => {
-  const items = await loadScreenshotIndex();
+  const items = await listScreenshotHistory();
   return { items };
 });
 
@@ -76,6 +125,10 @@ app.get('/api/jobs/:jobId', async (request, reply) => {
 
   return job;
 });
+
+app.get('/api/jobs', async () => ({
+  items: listJobs({ activeOnly: true })
+}));
 
 app.get('/api/entries', async () => {
   const items = await loadEntries();
@@ -107,11 +160,10 @@ async function parseUploadRequest(request) {
     fields[part.fieldname] = String(part.value ?? '');
   }
 
-  const lessonValue = fields.lesson ?? '1';
-  const lesson = Number.parseInt(String(lessonValue), 10);
+  const lesson = String(fields.lesson ?? '1').trim();
 
-  if (!Number.isInteger(lesson) || lesson < 1) {
-    throw new Error('Lesson must be a positive integer.');
+  if (!lesson) {
+    throw new Error('Lesson is required.');
   }
 
   const nameValue = String(fields.name ?? '').trim();
@@ -130,15 +182,48 @@ async function parseUploadRequest(request) {
   };
 }
 
+function getUploadSource(upload) {
+  return upload.fileBuffer ? 'image' : 'text';
+}
+
+function createProcessingJob(upload) {
+  return createJob('Uploading screenshot and preparing OCR.', {
+    name: upload.name,
+    source: getUploadSource(upload)
+  });
+}
+
+function updateProcessingJob(jobId) {
+  return ({ percent, stage, message }) => {
+    updateJob(jobId, {
+      status: 'processing',
+      progress: percent,
+      stage,
+      message
+    });
+  };
+}
+
 app.post('/api/upload', async (request, reply) => {
+  let job = null;
+
   try {
     const upload = await parseUploadRequest(request);
-    return await processScreenshot(upload);
+    job = createProcessingJob(upload);
+    const result = await processScreenshot({
+      ...upload,
+      onProgress: updateProcessingJob(job.id)
+    });
+    completeJob(job.id, result);
+    return result;
   } catch (error) {
     request.log.error(error);
+    if (job) {
+      failJob(job.id, error);
+    }
     reply.code(
       error.message === 'An image file or pasted text is required.' ||
-        error.message === 'Lesson must be a positive integer.'
+        error.message === 'Lesson is required.'
         ? 400
         : 500
     );
@@ -151,18 +236,11 @@ app.post('/api/upload', async (request, reply) => {
 app.post('/api/upload/jobs', async (request, reply) => {
   try {
     const upload = await parseUploadRequest(request);
-    const job = createJob('Uploading screenshot and preparing OCR.');
+    const job = createProcessingJob(upload);
 
     void processScreenshot({
       ...upload,
-      onProgress: ({ percent, stage, message }) => {
-        updateJob(job.id, {
-          status: 'processing',
-          progress: percent,
-          stage,
-          message
-        });
-      }
+      onProgress: updateProcessingJob(job.id)
     })
       .then((result) => {
         completeJob(job.id, result);
@@ -178,7 +256,7 @@ app.post('/api/upload/jobs', async (request, reply) => {
     request.log.error(error);
     reply.code(
       error.message === 'An image file or pasted text is required.' ||
-        error.message === 'Lesson must be a positive integer.'
+        error.message === 'Lesson is required.'
         ? 400
         : 500
     );
@@ -187,6 +265,25 @@ app.post('/api/upload/jobs', async (request, reply) => {
     };
   }
 });
+
+function getLanUrls(port) {
+  const interfaces = networkInterfaces();
+  const lanAddresses = new Set();
+
+  for (const entries of Object.values(interfaces)) {
+    for (const address of entries ?? []) {
+      if (address.internal || address.family !== 'IPv4') {
+        continue;
+      }
+
+      lanAddresses.add(address.address);
+    }
+  }
+
+  return [...lanAddresses]
+    .sort((left, right) => left.localeCompare(right))
+    .map((address) => `http://${address}:${port}`);
+}
 
 const closeApp = async () => {
   await shutdownWorker();
@@ -209,3 +306,11 @@ await app.listen({
 });
 
 app.log.info(`japanse-image-translator running at http://localhost:${PORT}`);
+
+for (const lanUrl of getLanUrls(PORT)) {
+  app.log.info(`japanse-image-translator reachable on your LAN at ${lanUrl}`);
+}
+
+if (API_KEY) {
+  app.log.info('API key protection is enabled for /api routes.');
+}

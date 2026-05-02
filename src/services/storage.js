@@ -26,14 +26,24 @@ async function writeJson(filePath, value) {
   await writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
 }
 
+function normalizeLessonIdPart(lesson) {
+  const normalized = String(lesson)
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  return normalized || 'DEFAULT';
+}
+
 function nextEntryId(prefix, lesson, entries) {
-  const lessonPrefix = `${prefix}${String(lesson).padStart(2, '0')}-`;
+  const lessonPrefix = `${prefix}${normalizeLessonIdPart(lesson)}-`;
   const maxIndex = entries.reduce((highest, entry) => {
     if (!entry.id.startsWith(lessonPrefix)) {
       return highest;
     }
 
-    const current = Number.parseInt(entry.id.split('-')[1], 10);
+    const current = Number.parseInt(entry.id.slice(entry.id.lastIndexOf('-') + 1), 10);
     return Number.isNaN(current) ? highest : Math.max(highest, current);
   }, 0);
 
@@ -87,6 +97,38 @@ export async function loadDictionary() {
 
 export async function loadScreenshotIndex() {
   return readJson(SCREENSHOT_INDEX_FILE, []);
+}
+
+export async function listScreenshotHistory() {
+  const index = await loadScreenshotIndex();
+
+  return Promise.all(
+    index.map(async (item) => {
+      const record = await loadScreenshotRecord(item.id);
+
+      if (!record) {
+        return {
+          ...item,
+          rawText: '',
+          lines: [],
+          entries: [],
+          source: item.imageUrl ? 'image' : 'pasted-text'
+        };
+      }
+
+      return {
+        ...item,
+        lesson: record.lesson ?? item.lesson,
+        imageUrl: record.imageUrl ?? item.imageUrl ?? null,
+        linesCount: record.lines?.length ?? item.linesCount ?? 0,
+        entriesCount: record.entries?.length ?? item.entriesCount ?? 0,
+        rawText: record.rawText ?? '',
+        lines: record.lines ?? [],
+        entries: record.entries ?? [],
+        source: record.source ?? (record.imageUrl ? 'image' : 'pasted-text')
+      };
+    })
+  );
 }
 
 export async function loadScreenshotRecord(screenshotId) {
