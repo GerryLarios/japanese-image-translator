@@ -4,7 +4,7 @@ Local Node.js app to receive Japanese game screenshots, extract text with OCR, t
 
 ## What it does
 
-- Accepts screenshot uploads from a browser or any HTTP client
+- Accepts screenshot uploads or pasted clipboard images from a browser, or file uploads from any HTTP client
 - Accepts pasted Japanese text copied from macOS Live Text or another OCR source
 - Runs local Japanese OCR with Apple Vision on macOS and Tesseract elsewhere
 - Tokenizes text into vocabulary entries with hiragana and romaji
@@ -42,9 +42,21 @@ ollama serve
 npm start
 ```
 
+Or use the shell alias:
+
+```bash
+start-jp-translator
+```
+
+If you have not loaded it in your current terminal yet:
+
+```bash
+source ~/.zshrc
+```
+
 Open `http://localhost:3000`.
 
-You can either upload a screenshot or paste Japanese text directly into the form. If both are provided, the pasted text is used and the uploaded image is kept only as a visual reference.
+You can upload a screenshot, paste an image into the form, or paste Japanese text directly. If both image and text are provided, the pasted text is used and the image is kept only as a visual reference.
 
 ## UI workflow
 
@@ -64,6 +76,23 @@ curl -X POST http://localhost:3000/api/upload \
   -F lesson=1 \
   -F image=@/path/to/screenshot.png
 ```
+
+### Batch upload every screenshot in a folder
+
+```bash
+find "/Users/gerry/Desktop/screenshots" -type f \( \
+  -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' \
+\) -print0 | while IFS= read -r -d '' file; do
+  echo "Processing: $(basename "$file")"
+  curl -sS -X POST http://localhost:3000/api/upload \
+    -F "lesson=1" \
+    -F "name=$(basename "$file")" \
+    -F "image=@$file"
+  echo
+done
+```
+
+This sends screenshots one by one through the same OCR and Ollama pipeline used by the web UI.
 
 ### Upload pasted text
 

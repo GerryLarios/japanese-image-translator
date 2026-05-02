@@ -9,10 +9,12 @@ const progressPercent = document.getElementById('progress-percent');
 const progressMessage = document.getElementById('progress-message');
 const submitButton = form.querySelector('button[type="submit"]');
 const nukeButton = document.getElementById('nuke-button');
+const imageInput = form.elements.image;
 
 let activeJobId = null;
 let pollTimer = null;
 let latestResultId = null;
+let clipboardImage = null;
 
 function setStatus(message, isError = false) {
   statusNode.textContent = message;
@@ -32,6 +34,34 @@ function setProgress({ visible, percent = 0, stage = '', message = '', isError =
 function setSubmitting(isSubmitting) {
   submitButton.disabled = isSubmitting;
   submitButton.textContent = isSubmitting ? 'Working...' : 'Process screenshot';
+}
+
+function getImageExtension(mimeType) {
+  if (mimeType === 'image/jpeg') {
+    return 'jpg';
+  }
+
+  if (mimeType === 'image/gif') {
+    return 'gif';
+  }
+
+  if (mimeType === 'image/webp') {
+    return 'webp';
+  }
+
+  return 'png';
+}
+
+function createClipboardImageFile(file) {
+  if (file.name) {
+    return file;
+  }
+
+  const extension = getImageExtension(file.type);
+  return new File([file], `clipboard-${Date.now()}.${extension}`, {
+    type: file.type || 'image/png',
+    lastModified: Date.now()
+  });
 }
 
 function renderResult(payload) {
@@ -226,6 +256,7 @@ async function pollJob(jobId) {
     renderResult(payload.result);
     await loadHistory();
     setStatus(`Saved ${payload.result.entries.length} entries from ${payload.result.id}.`);
+    clipboardImage = null;
     form.reset();
     form.elements.lesson.value = '1';
     return;
@@ -254,6 +285,31 @@ async function pollJob(jobId) {
   }, 1200);
 }
 
+form.addEventListener('paste', (event) => {
+  const clipboardItems = [...(event.clipboardData?.items ?? [])];
+  const imageItem = clipboardItems.find((item) => item.type.startsWith('image/'));
+
+  if (!imageItem) {
+    return;
+  }
+
+  const imageFile = imageItem.getAsFile();
+  if (!imageFile) {
+    return;
+  }
+
+  event.preventDefault();
+  clipboardImage = createClipboardImageFile(imageFile);
+  imageInput.value = '';
+  setStatus(`Clipboard image ready: ${clipboardImage.name}`);
+});
+
+imageInput.addEventListener('change', () => {
+  if (imageInput.files?.length) {
+    clipboardImage = null;
+  }
+});
+
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
   if (pollTimer) {
@@ -263,8 +319,14 @@ form.addEventListener('submit', async (event) => {
 
   setStatus('');
   setSubmitting(true);
+  const formData = new FormData(form);
+  const uploadedImage = formData.get('image');
+  const imageFile = uploadedImage instanceof File && uploadedImage.name ? uploadedImage : clipboardImage;
+  if (imageFile && (!uploadedImage || !(uploadedImage instanceof File) || !uploadedImage.name)) {
+    formData.set('image', imageFile, imageFile.name);
+  }
   const pastedText = String(formData.get('pastedText') || '').trim();
-  const hasImage = Boolean(formData.get('image')?.name);
+  const hasImage = Boolean(imageFile?.name);
   setProgress({
     visible: true,
     percent: 5,
@@ -273,8 +335,6 @@ form.addEventListener('submit', async (event) => {
       ? 'Sending pasted text to the local server.'
       : 'Uploading screenshot to the local server.'
   });
-
-  const formData = new FormData(form);
 
   try {
     const response = await fetch('/api/upload/jobs', {
