@@ -36,6 +36,22 @@ function normalizeLessonIdPart(lesson) {
   return normalized || 'DEFAULT';
 }
 
+function buildLineFromSentenceEntry(entry) {
+  return {
+    japanese: entry.japanese,
+    hiragana: entry.hiragana,
+    romaji: entry.romaji,
+    english: entry.english,
+    spanish: entry.spanish
+  };
+}
+
+function buildLinesFromEntries(entries) {
+  return (entries ?? [])
+    .filter((entry) => entry.type === 'sentence')
+    .map((entry) => buildLineFromSentenceEntry(entry));
+}
+
 function nextEntryId(prefix, lesson, entries) {
   const lessonPrefix = `${prefix}${normalizeLessonIdPart(lesson)}-`;
   const maxIndex = entries.reduce((highest, entry) => {
@@ -202,6 +218,79 @@ export async function saveScreenshotRecord(record) {
   await writeJson(SCREENSHOT_INDEX_FILE, index);
 }
 
+export async function updateEntryRecord(entryId, nextValues) {
+  const normalizedEntryId = String(entryId ?? '').trim();
+  if (!normalizedEntryId) {
+    return null;
+  }
+
+  const currentEntries = await loadEntries();
+  const entryIndex = currentEntries.findIndex((entry) => entry.id === normalizedEntryId);
+  if (entryIndex < 0) {
+    return null;
+  }
+
+  const updatedEntry = {
+    ...currentEntries[entryIndex],
+    ...nextValues,
+    id: currentEntries[entryIndex].id,
+    lesson: currentEntries[entryIndex].lesson
+  };
+
+  const nextEntries = [...currentEntries];
+  nextEntries[entryIndex] = updatedEntry;
+
+  const index = await loadScreenshotIndex();
+  const updatedIndex = [];
+  const affectedScreenshots = [];
+
+  for (const item of index) {
+    const record = await loadScreenshotRecord(item.id);
+    const existingEntries = record?.entries ?? [];
+    const matchesEntry = existingEntries.some((entry) => entry.id === normalizedEntryId);
+
+    if (!record || !matchesEntry) {
+      updatedIndex.push(item);
+      continue;
+    }
+
+    const recordEntries = existingEntries.map((entry) =>
+      entry.id === normalizedEntryId
+        ? {
+            ...entry,
+            ...nextValues,
+            id: entry.id,
+            lesson: entry.lesson
+          }
+        : entry
+    );
+    const nextLines = buildLinesFromEntries(recordEntries);
+    const detailPath = path.join(SCREENSHOTS_DIR, `${item.id}.json`);
+
+    await writeJson(detailPath, {
+      ...record,
+      entries: recordEntries,
+      lines: nextLines
+    });
+
+    updatedIndex.push({
+      ...item,
+      linesCount: nextLines.length,
+      entriesCount: recordEntries.length
+    });
+    affectedScreenshots.push(item.id);
+  }
+
+  await saveEntries(nextEntries);
+  await writeJson(SCREENSHOT_INDEX_FILE, updatedIndex);
+
+  return {
+    entry: updatedEntry,
+    updatedScreenshots: affectedScreenshots.length,
+    affectedScreenshots
+  };
+}
+
 export async function deleteEntryRecords(entryIds) {
   const uniqueEntryIds = [...new Set(entryIds.map((entryId) => String(entryId).trim()).filter(Boolean))];
   if (!uniqueEntryIds.length) {
@@ -238,14 +327,18 @@ export async function deleteEntryRecords(entryIds) {
       continue;
     }
 
+    const nextLines = buildLinesFromEntries(nextEntries);
+
     const detailPath = path.join(SCREENSHOTS_DIR, `${item.id}.json`);
     await writeJson(detailPath, {
       ...record,
+      lines: nextLines,
       entries: nextEntries
     });
 
     updatedIndex.push({
       ...item,
+      linesCount: nextLines.length,
       entriesCount: nextEntries.length
     });
     affectedScreenshots.push(item.id);

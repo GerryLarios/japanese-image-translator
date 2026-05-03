@@ -208,17 +208,21 @@ button {
 
 .history-delete-button {
   position: absolute;
-  top: 16px;
-  right: 16px;
-  width: 40px;
-  height: 40px;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
   padding: 0;
   display: grid;
   place-items: center;
-  font-size: 24px;
+  border-radius: 999px;
+  font-size: 22px;
+  font-weight: 700;
   line-height: 1;
   background: #7f1d1d;
   border-color: #b91c1c;
+  color: #fee2e2;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
 }
 
 .history-image-panel {
@@ -264,6 +268,10 @@ button {
 .history-sections {
   display: grid;
   gap: 12px;
+}
+
+.history-card-action {
+  justify-self: start;
 }
 
 .history-section-header {
@@ -386,11 +394,13 @@ button {
 }
 
 .modal-content {
+  grid-template-rows: auto minmax(0, 1fr);
   background: #0f172a;
   border: 1px solid #334155;
   border-radius: 16px;
   padding: 24px;
   overflow: hidden;
+  min-height: 0;
 }
 
 .lightbox-title {
@@ -431,6 +441,7 @@ button {
 
 .modal-body {
   overflow: auto;
+  min-height: 0;
 }
 
 .history-placeholder {
@@ -504,6 +515,48 @@ td {
 .table-action-button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
+}
+
+.entry-id-cell {
+  white-space: nowrap;
+}
+
+.entry-input-cell {
+  min-width: 132px;
+}
+
+.table-input {
+  width: 100%;
+  min-width: 120px;
+  padding: 8px 10px;
+}
+
+.entry-actions-cell {
+  min-width: 190px;
+}
+
+.entry-row-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+
+.compact-button {
+  padding: 8px 10px;
+  white-space: nowrap;
+}
+
+.entry-row-status {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+}
+
+.entry-edit-row-dirty {
+  background: rgba(37, 99, 235, 0.06);
+}
+
+.entry-edit-row-busy {
+  opacity: 0.72;
 }
 
 @media (max-width: 720px) {

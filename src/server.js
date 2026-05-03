@@ -16,7 +16,7 @@ import {
   ensureDataFiles,
   listScreenshotHistory,
   loadEntries,
-  loadScreenshotIndex
+  updateEntryRecord
 } from './services/storage.js';
 
 function createLoggerOptions() {
@@ -146,9 +146,15 @@ app.get('/api/jobs/:jobId', async (request, reply) => {
   return job;
 });
 
-app.get('/api/jobs', async () => ({
-  items: listJobs({ activeOnly: true })
-}));
+app.get(
+  '/api/jobs',
+  {
+    logLevel: 'silent'
+  },
+  async () => ({
+    items: listJobs({ activeOnly: true })
+  })
+);
 
 app.get('/api/entries', async () => {
   const items = await loadEntries();
@@ -159,6 +165,42 @@ app.get('/api/entries/export', async (_, reply) => {
   const items = await loadEntries();
   reply.header('Content-Disposition', 'attachment; filename="entries.json"');
   return items;
+});
+
+function parseEntryUpdateRequest(body) {
+  const editableFields = ['japanese', 'hiragana', 'romaji', 'english', 'spanish', 'type'];
+  const updates = {};
+
+  for (const field of editableFields) {
+    const value = String(body?.[field] ?? '').trim();
+    if (!value) {
+      throw new Error(`${field} is required.`);
+    }
+
+    updates[field] = value;
+  }
+
+  return updates;
+}
+
+app.put('/api/entries/:entryId', async (request, reply) => {
+  let updates;
+
+  try {
+    updates = parseEntryUpdateRequest(request.body);
+  } catch (error) {
+    reply.code(400);
+    return { message: error.message || 'Invalid entry update.' };
+  }
+
+  const updated = await updateEntryRecord(request.params.entryId, updates);
+
+  if (!updated) {
+    reply.code(404);
+    return { message: 'Entry not found.' };
+  }
+
+  return updated;
 });
 
 app.delete('/api/entries/:entryId', async (request, reply) => {

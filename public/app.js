@@ -30,6 +30,7 @@ const entriesModalCloseButton = document.getElementById('entries-modal-close');
 const API_KEY_STORAGE_KEY = 'jp-translator-api-key';
 const HISTORY_LINES_PREVIEW_LIMIT = 4;
 const JOBS_POLL_INTERVAL_MS = 1500;
+const EDITABLE_ENTRY_FIELDS = ['japanese', 'hiragana', 'romaji', 'english', 'spanish', 'type'];
 
 let activeJobId = null;
 let pollTimer = null;
@@ -213,7 +214,7 @@ function renderEntriesTable(entries) {
   const rows = (entries ?? [])
     .map(
       (entry) => `
-        <tr>
+        <tr class="entry-edit-row" data-entry-row data-entry-id="${escapeHtml(entry.id)}">
           <td class="table-checkbox-cell">
             <input
               type="checkbox"
@@ -223,13 +224,27 @@ function renderEntriesTable(entries) {
               aria-label="Select ${escapeHtml(entry.id)}"
             />
           </td>
-          <td>${escapeHtml(entry.id)}</td>
-          <td>${escapeHtml(entry.japanese)}</td>
-          <td>${escapeHtml(entry.hiragana)}</td>
-          <td>${escapeHtml(entry.romaji)}</td>
-          <td>${escapeHtml(entry.english)}</td>
-          <td>${escapeHtml(entry.spanish)}</td>
-          <td>${escapeHtml(entry.type)}</td>
+          <td class="entry-id-cell">${escapeHtml(entry.id)}</td>
+          ${EDITABLE_ENTRY_FIELDS.map(
+            (field) => `
+              <td class="entry-input-cell">
+                <input
+                  type="text"
+                  class="table-input"
+                  data-entry-field="${field}"
+                  value="${escapeHtml(entry[field])}"
+                  aria-label="${field} for ${escapeHtml(entry.id)}"
+                />
+              </td>
+            `
+          ).join('')}
+          <td class="entry-actions-cell">
+            <div class="entry-row-actions">
+              <button type="button" class="secondary-button compact-button" data-save-entry disabled>Save</button>
+              <button type="button" class="secondary-button compact-button" data-reset-entry disabled>Reset</button>
+            </div>
+            <p class="entry-row-status muted" data-entry-row-status>Saved</p>
+          </td>
         </tr>
       `
     )
@@ -256,9 +271,10 @@ function renderEntriesTable(entries) {
               <th>English</th>
               <th>Spanish</th>
               <th>Type</th>
+              <th>Actions</th>
             </tr>
           </thead>
-          <tbody>${rows || '<tr><td colspan="8">No entries generated.</td></tr>'}</tbody>
+          <tbody>${rows || '<tr><td colspan="9">No entries generated.</td></tr>'}</tbody>
         </table>
       </div>
     </div>
@@ -324,6 +340,71 @@ function updateEntriesSelectionState(panelNode) {
   }
 }
 
+function getEntryRowInputs(rowNode) {
+  return [...rowNode.querySelectorAll('[data-entry-field]')];
+}
+
+function readEntryRowValues(rowNode) {
+  return Object.fromEntries(
+    getEntryRowInputs(rowNode).map((input) => [input.dataset.entryField, input.value.trim()])
+  );
+}
+
+function isEntryRowDirty(rowNode) {
+  return getEntryRowInputs(rowNode).some((input) => input.value !== input.defaultValue);
+}
+
+function updateEntryRowState(rowNode, statusText = null) {
+  if (!rowNode) {
+    return;
+  }
+
+  const dirty = isEntryRowDirty(rowNode);
+  const isBusy = rowNode.classList.contains('entry-edit-row-busy');
+  const saveButton = rowNode.querySelector('[data-save-entry]');
+  const resetButton = rowNode.querySelector('[data-reset-entry]');
+  const statusNode = rowNode.querySelector('[data-entry-row-status]');
+
+  rowNode.classList.toggle('entry-edit-row-dirty', dirty);
+
+  if (saveButton) {
+    saveButton.disabled = isBusy || !dirty;
+  }
+
+  if (resetButton) {
+    resetButton.disabled = isBusy || !dirty;
+  }
+
+  if (statusNode) {
+    statusNode.textContent = statusText ?? (dirty ? 'Unsaved changes' : 'Saved');
+  }
+}
+
+function setEntryRowBusy(rowNode, isBusy, statusText) {
+  rowNode.classList.toggle('entry-edit-row-busy', isBusy);
+
+  getEntryRowInputs(rowNode).forEach((input) => {
+    input.disabled = isBusy;
+  });
+
+  const saveButton = rowNode.querySelector('[data-save-entry]');
+  const resetButton = rowNode.querySelector('[data-reset-entry]');
+
+  if (saveButton) {
+    saveButton.disabled = isBusy || !isEntryRowDirty(rowNode);
+    saveButton.textContent = isBusy ? 'Saving...' : 'Save';
+  }
+
+  if (resetButton) {
+    resetButton.disabled = isBusy || !isEntryRowDirty(rowNode);
+  }
+
+  const statusNode = rowNode.querySelector('[data-entry-row-status]');
+  if (statusNode && statusText) {
+    statusNode.textContent = statusText;
+  }
+}
+
 function toggleEntrySelection(panelNode) {
   if (!panelNode) {
     return;
@@ -340,6 +421,9 @@ function toggleEntrySelection(panelNode) {
 function initializeEntriesPanels(scope) {
   scope.querySelectorAll('[data-entries-panel]').forEach((panelNode) => {
     updateEntriesSelectionState(panelNode);
+    panelNode.querySelectorAll('[data-entry-row]').forEach((rowNode) => {
+      updateEntryRowState(rowNode);
+    });
   });
 }
 
@@ -498,12 +582,24 @@ function renderHistory(items) {
             class="history-delete-button"
             data-delete-screenshot="${escapeHtml(item.id)}"
             aria-label="Remove ${escapeHtml(item.name || item.id)}"
-            title="Remove"
           >
             ×
           </button>
           ${imageMarkup}
           <div class="history-content">
+            ${
+              item.entries?.length
+                ? `
+                  <button
+                    type="button"
+                    class="secondary-button history-card-action"
+                    data-show-entries="${escapeHtml(item.id)}"
+                  >
+                    Show full list
+                  </button>
+                `
+                : ''
+            }
             <h3>${escapeHtml(item.name || item.id)}</h3>
             <div class="history-meta">
               <span>${escapeHtml(item.id)}</span>
@@ -554,22 +650,7 @@ function renderHistory(items) {
               </section>
 
               <section class="history-section">
-                <div class="history-section-header">
-                  <h4>Entries</h4>
-                  ${
-                    item.entries?.length
-                      ? `
-                        <button
-                          type="button"
-                          class="secondary-button"
-                          data-show-entries="${escapeHtml(item.id)}"
-                        >
-                          Show full list
-                        </button>
-                      `
-                      : ''
-                  }
-                </div>
+                <h4>Entries</h4>
                 <p class="muted">
                   ${escapeHtml(String(item.entries?.length ?? 0))} entr${item.entries?.length === 1 ? 'y is' : 'ies are'} saved for this screenshot.
                 </p>
@@ -676,6 +757,56 @@ async function discardEntries(entryIds) {
   setStatus(
     `Discarded ${payload.removedEntries} entr${payload.removedEntries === 1 ? 'y' : 'ies'} from ${payload.removedFrom} screenshot${payload.removedFrom === 1 ? '' : 's'}.`
   );
+}
+
+async function saveEntryRow(rowNode) {
+  if (!rowNode) {
+    return;
+  }
+
+  const entryId = rowNode.dataset.entryId;
+  const values = readEntryRowValues(rowNode);
+
+  for (const field of EDITABLE_ENTRY_FIELDS) {
+    if (!values[field]) {
+      throw new Error(`${field} is required.`);
+    }
+  }
+
+  setEntryRowBusy(rowNode, true, 'Saving...');
+
+  try {
+    const response = await apiFetch(`/api/entries/${entryId}`, {
+      method: 'PUT',
+      headers: {
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify(values)
+    });
+
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response, 'Could not update entry.'));
+    }
+
+    await refreshEntryViews();
+    setStatus(`Updated ${entryId}.`);
+  } finally {
+    if (document.body.contains(rowNode)) {
+      setEntryRowBusy(rowNode, false);
+      updateEntryRowState(rowNode);
+    }
+  }
+}
+
+function resetEntryRow(rowNode) {
+  if (!rowNode) {
+    return;
+  }
+
+  getEntryRowInputs(rowNode).forEach((input) => {
+    input.value = input.defaultValue;
+  });
+  updateEntryRowState(rowNode);
 }
 
 async function nukeAllData() {
@@ -959,20 +1090,50 @@ authForm.addEventListener('submit', (event) => {
 
 resultNode.addEventListener('change', (event) => {
   const checkbox = event.target.closest('[data-entry-select]');
-  if (!checkbox) {
+  if (checkbox) {
+    updateEntriesSelectionState(checkbox.closest('[data-entries-panel]'));
     return;
   }
 
-  updateEntriesSelectionState(checkbox.closest('[data-entries-panel]'));
+  const input = event.target.closest('[data-entry-field]');
+  if (!input) {
+    return;
+  }
+
+  updateEntryRowState(input.closest('[data-entry-row]'));
 });
 
 entriesModalBody.addEventListener('change', (event) => {
   const checkbox = event.target.closest('[data-entry-select]');
-  if (!checkbox) {
+  if (checkbox) {
+    updateEntriesSelectionState(checkbox.closest('[data-entries-panel]'));
     return;
   }
 
-  updateEntriesSelectionState(checkbox.closest('[data-entries-panel]'));
+  const input = event.target.closest('[data-entry-field]');
+  if (!input) {
+    return;
+  }
+
+  updateEntryRowState(input.closest('[data-entry-row]'));
+});
+
+resultNode.addEventListener('input', (event) => {
+  const input = event.target.closest('[data-entry-field]');
+  if (!input) {
+    return;
+  }
+
+  updateEntryRowState(input.closest('[data-entry-row]'));
+});
+
+entriesModalBody.addEventListener('input', (event) => {
+  const input = event.target.closest('[data-entry-field]');
+  if (!input) {
+    return;
+  }
+
+  updateEntryRowState(input.closest('[data-entry-row]'));
 });
 
 resultNode.addEventListener('click', (event) => {
@@ -983,13 +1144,28 @@ resultNode.addEventListener('click', (event) => {
   }
 
   const discardButton = event.target.closest('[data-discard-selected]');
-  if (!discardButton) {
+  if (discardButton) {
+    discardEntries(getSelectedEntryIds(discardButton.closest('[data-entries-panel]'))).catch((error) => {
+      setStatus(error.message, true);
+    });
     return;
   }
 
-  discardEntries(getSelectedEntryIds(discardButton.closest('[data-entries-panel]'))).catch((error) => {
-    setStatus(error.message, true);
-  });
+  const saveButton = event.target.closest('[data-save-entry]');
+  if (saveButton) {
+    saveEntryRow(saveButton.closest('[data-entry-row]')).catch((error) => {
+      setStatus(error.message, true);
+      updateEntryRowState(saveButton.closest('[data-entry-row]'), error.message);
+    });
+    return;
+  }
+
+  const resetButton = event.target.closest('[data-reset-entry]');
+  if (!resetButton) {
+    return;
+  }
+
+  resetEntryRow(resetButton.closest('[data-entry-row]'));
 });
 
 entriesModalBody.addEventListener('click', (event) => {
@@ -1000,13 +1176,28 @@ entriesModalBody.addEventListener('click', (event) => {
   }
 
   const discardButton = event.target.closest('[data-discard-selected]');
-  if (!discardButton) {
+  if (discardButton) {
+    discardEntries(getSelectedEntryIds(discardButton.closest('[data-entries-panel]'))).catch((error) => {
+      setStatus(error.message, true);
+    });
     return;
   }
 
-  discardEntries(getSelectedEntryIds(discardButton.closest('[data-entries-panel]'))).catch((error) => {
-    setStatus(error.message, true);
-  });
+  const saveButton = event.target.closest('[data-save-entry]');
+  if (saveButton) {
+    saveEntryRow(saveButton.closest('[data-entry-row]')).catch((error) => {
+      setStatus(error.message, true);
+      updateEntryRowState(saveButton.closest('[data-entry-row]'), error.message);
+    });
+    return;
+  }
+
+  const resetButton = event.target.closest('[data-reset-entry]');
+  if (!resetButton) {
+    return;
+  }
+
+  resetEntryRow(resetButton.closest('[data-entry-row]'));
 });
 
 historyNode.addEventListener('click', (event) => {

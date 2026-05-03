@@ -64,7 +64,7 @@ Open `http://localhost:3000` on the same Mac.
 
 If another device on your local network needs to reach the receiver running on this Mac, use the Mac's LAN address instead, for example `http://192.168.1.50:3000`.
 
-On startup, the server logs the `localhost` URL and any detected LAN URLs.
+On startup, the server prints a readable summary with the `localhost` URL, any detected LAN URLs, and whether API-key protection is enabled.
 
 You can upload a screenshot, paste an image into the form, or paste Japanese text directly. If both image and text are provided, the pasted text is used and the image is kept only as a visual reference.
 
@@ -75,6 +75,7 @@ If `API_KEY` is configured, the browser UI will ask for it once per device and s
 - Add a **Name** to label the screenshot or pasted text job
 - Upload a screenshot, paste Japanese text, or do both
 - Watch the progress bar for OCR, analysis, translation, and saving stages
+- Edit saved entry values inline in the table when you want to fix readings or translations
 - Remove one result with the `×` button in **Recent screenshots**
 - Use **Nuke all** to clear all generated screenshots, uploads, and entries from local storage
 

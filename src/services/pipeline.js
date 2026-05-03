@@ -73,12 +73,11 @@ export async function processScreenshot({ fileBuffer, filename, lesson, name, ra
     message: 'Analyzing text, readings, and vocabulary.'
   });
   const analyzedLines = await analyzeText(rawText);
-  const vocabulary = await buildVocabulary(analyzedLines);
+  const japaneseLines = analyzedLines.filter((line) => containsJapanese(line.japanese));
+  const vocabulary = (await buildVocabulary(japaneseLines)).filter((entry) => containsJapanese(entry.japanese));
   const dictionary = await loadDictionary();
 
-  const lineInputs = analyzedLines
-    .filter((line) => containsJapanese(line.japanese))
-    .map((line) => ({ japanese: line.japanese }));
+  const lineInputs = japaneseLines.map((line) => ({ japanese: line.japanese }));
   const untranslatedVocabulary = vocabulary
     .filter((entry) => containsJapanese(entry.japanese) && !dictionary[entry.japanese])
     .map((entry) => ({ japanese: entry.japanese }));
@@ -122,7 +121,7 @@ export async function processScreenshot({ fileBuffer, filename, lesson, name, ra
   });
 
   const sentenceEntries = await Promise.all(
-    analyzedLines.map(async (line) => {
+    japaneseLines.map(async (line) => {
       const translated = lineTranslations.get(line.japanese);
       const reading = await toReading(line.japanese);
       const fallbackTranslation = {
